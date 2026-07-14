@@ -1,0 +1,22 @@
+./course_app
+Enter the number of courses, you want to enter: 3
+Enter Subject name: Maths
+Enter Subject Code: M101
+Subject ID: 0
+--------------------------------------------
+Enter Subject name: Physics
+Enter Subject Code: P102
+Subject ID: 1
+--------------------------------------------
+Enter Subject name: Chemistry
+Enter Subject Code: C201
+Subject ID: 2
+--------------------------------------------
+Enter the number of dependencies you want to add: 3
+Enter dependencies(ID):
+1 2
+0 1
+1 3
+Rule Added: Must take [P102] before [C201]
+Rule Added: Must take [M101] before [P102]
+Error: Course ID not found

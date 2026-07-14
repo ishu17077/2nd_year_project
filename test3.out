@@ -1,0 +1,27 @@
+./course_app
+Enter the number of courses, you want to enter: 4
+Enter Subject name: Computer
+Enter Subject Code: CS101
+Subject ID: 0
+--------------------------------------------
+Enter Subject name: Physics
+Enter Subject Code: P101
+Subject ID: 1
+--------------------------------------------
+Enter Subject name: Chemistry
+Enter Subject Code: C202
+Subject ID: 2
+--------------------------------------------
+Enter Subject name: Maths    
+Enter Subject Code: M301
+Subject ID: 3
+--------------------------------------------
+Enter the number of dependencies you want to add: 3
+Enter dependencies(ID):
+0 1 2
+2 1
+3
+Rule Added: Must take [CS101] before [P101]
+Rule Added: Must take [P101] before [C202]
+Rule Added: Must take [C202] before [P101]
+Error: Circular dependency exist! Impossible to continue this path.

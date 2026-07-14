@@ -1,0 +1,33 @@
+ ./course_app 
+Enter the number of courses, you want to enter: 3
+Enter Subject name: Maths
+Enter Subject Code: M101
+Subject ID: 0
+--------------------------------------------
+Enter Subject name: Physics
+Enter Subject Code: P101
+Subject ID: 1
+--------------------------------------------
+Enter Subject name: Computer
+Enter Subject Code: C201
+Subject ID: 2
+--------------------------------------------
+Enter the number of dependencies you want to add: 2
+Enter dependencies(ID):
+0 2
+1 2
+Rule Added: Must take [M101] before [C201]
+Rule Added: Must take [P101] before [C201]
+Enter course id to get prerequisite and complete chain: 2
+Prerequisite to the course: 
+-------------------------------------
+M101
+P101
+
+
+
+Complete chain: 
+-------------------------------------
+M101
+P101
+C201
