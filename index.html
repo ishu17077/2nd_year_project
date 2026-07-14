@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Prerequisite Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; color: #0f172a; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container { height: 350px; }
+        }
+        .tab-btn.active { border-bottom: 2px solid #4f46e5; color: #4f46e5; font-weight: 600; }
+        .matrix-cell { transition: all 0.2s; }
+        .matrix-cell.active { background-color: #e0e7ff; font-weight: bold; color: #4f46e5; }
+        .matrix-cell.highlight-cycle { background-color: #fee2e2; color: #b91c1c; }
+        .hide { display: none !important; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+<!-- Chosen Palette: Slate (Backgrounds/Text), Indigo (Primary Actions), Emerald (Success/Paths), Rose (Errors/Cycles) -->
+<!-- Application Structure Plan: The SPA uses a split-screen dashboard architecture. The right panel maintains a persistent visual state (Canvas Graph and Adjacency Matrix table) so users never lose context of the data structure. The left panel uses a tabbed interface (Overview, Graph Builder, Cycle Detection, Path Traversal) corresponding to the report's key sections. This allows users to sequentially learn the theory, build the dataset, test the DFS cycle algorithm, and test the BFS traversal algorithm, all while watching the persistent visualization react in real-time. -->
+<!-- Visualization & Content Choices: 
+1. Report Info: Graph Construction -> Goal: Visualize Adjacency Matrix -> Viz: HTML Table -> Interaction: Auto-updates on edge addition -> Justification: Directly maps to report's 2D array concept -> Library: Vanilla JS DOM manipulation (NO SVG).
+2. Report Info: Directed Graph -> Goal: Show physical dependencies -> Viz: HTML5 Canvas -> Interaction: Draws nodes/arrows based on matrix state, highlights nodes based on algorithm steps -> Justification: Replaces static diagrams with a dynamic engine without needing external SVG/physics libraries -> Library: Canvas API (NO SVG).
+3. Report Info: Complexity Analysis -> Goal: Show O(V^2) scaling -> Viz: Line Chart -> Interaction: Hover tooltips -> Justification: Visually proves why matrix approaches consume more memory at scale -> Library: Chart.js.
+-->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <header class="bg-indigo-900 text-white p-6 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Course Prerequisite Management System</h1>
+                <p class="text-indigo-200 text-sm mt-1">Interactive Academic Dependency Resolution & Cycle Detection</p>
+            </div>
+            <div class="text-right hidden md:block">
+                <p class="text-xs text-indigo-300">Design & Analysis of Algorithms</p>
+                <p class="text-xs text-indigo-300">Project Code: PCC-CS404</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <div class="lg:col-span-5 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="flex border-b border-slate-200 bg-slate-50 overflow-x-auto">
+                <button class="tab-btn active px-4 py-3 text-sm text-slate-600 hover:bg-slate-100 whitespace-nowrap" data-target="tab-overview">Overview</button>
+                <button class="tab-btn px-4 py-3 text-sm text-slate-600 hover:bg-slate-100 whitespace-nowrap" data-target="tab-build">1. Graph Builder</button>
+                <button class="tab-btn px-4 py-3 text-sm text-slate-600 hover:bg-slate-100 whitespace-nowrap" data-target="tab-cycle">2. Cycle Detection</button>
+                <button class="tab-btn px-4 py-3 text-sm text-slate-600 hover:bg-slate-100 whitespace-nowrap" data-target="tab-path">3. Path Traversal</button>
+            </div>
+
+            <div class="p-6 flex-grow overflow-y-auto max-h-[70vh]">
+                
+                <div id="tab-overview" class="tab-content">
+                    <h2 class="text-xl font-bold mb-3 text-slate-800">Project Abstract & Architecture</h2>
+                    <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+                        In higher education, academic curricula consist of complex prerequisite constraints. Manually auditing course plans is prone to human error and can inadvertently introduce unresolvable "cycles". This interactive system mathematically models courses as a Directed Graph using an Adjacency Matrix.
+                    </p>
+                    <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-lg mb-6">
+                        <h3 class="font-semibold text-indigo-900 mb-2 text-sm">Core Objectives</h3>
+                        <ul class="list-disc pl-5 text-sm text-indigo-800 space-y-1">
+                            <li>Map real-world dependencies into a 2D computational grid.</li>
+                            <li>Detect illegal circular dependencies using Depth-First Search (DFS) with 3-State Graph Coloring.</li>
+                            <li>Generate pre-requisite and post-requisite chains using Breadth-First Search (BFS).</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="font-semibold text-slate-800 mb-2">Algorithm Complexity</h3>
+                    <p class="text-sm text-slate-600 mb-4">
+                        The system uses an Adjacency Matrix structure. While this allows blazing-fast $O(1)$ edge verifications, it scales at $O(V^2)$ for both Time and Space complexity, requiring careful management for extremely large course catalogs.
+                    </p>
+                    <div class="chart-container border border-slate-100 rounded-lg p-2 bg-white">
+                        <canvas id="complexityChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="tab-build" class="tab-content hide">
+                    <h2 class="text-xl font-bold mb-3 text-slate-800">Graph Construction</h2>
+                    <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+                        To compute pathways, we must first map the curriculum. The system converts relational rules (e.g., "Take CS101 before CS201") into a strict mathematical structure called an Adjacency Matrix. Select courses below to build directed edges in real-time.
+                    </p>
+                    
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4">
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Define Prerequisite Rule</label>
+                        <div class="flex flex-col gap-3">
+                            <div>
+                                <span class="text-sm font-medium">Must complete:</span>
+                                <select id="sel-from" class="mt-1 w-full p-2 border border-slate-300 rounded-md text-sm bg-white focus:outline-none focus:border-indigo-500"></select>
+                            </div>
+                            <div class="flex justify-center text-slate-400 font-bold">&#8595;</div>
+                            <div>
+                                <span class="text-sm font-medium">Before taking:</span>
+                                <select id="sel-to" class="mt-1 w-full p-2 border border-slate-300 rounded-md text-sm bg-white focus:outline-none focus:border-indigo-500"></select>
+                            </div>
+                            <button id="btn-add-edge" class="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition-colors">Add Dependency Rule</button>
+                        </div>
+                    </div>
+                    <button id="btn-reset" class="w-full bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-medium py-2 px-4 rounded-md transition-colors text-sm">Reset Graph</button>
+                    
+                    <div id="build-msg" class="mt-3 text-sm hidden p-3 rounded-md"></div>
+                </div>
+
+                <div id="tab-cycle" class="tab-content hide">
+                    <h2 class="text-xl font-bold mb-3 text-slate-800">DFS Cycle Detection</h2>
+                    <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+                        A circular dependency (e.g., A requires B, and B requires A) breaks the curriculum. The system uses a recursive Depth-First Search with <strong>Graph Coloring</strong> to detect these loops. If the algorithm ever encounters a node currently marked as "Visiting", a cycle is mathematically confirmed.
+                    </p>
+
+                    <div class="flex gap-4 text-xs font-medium mb-6">
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full border border-slate-400 bg-white inline-block"></span> Unvisited</div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Visiting</div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-slate-800 inline-block"></span> Visited</div>
+                    </div>
+
+                    <button id="btn-check-cycle" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-3 px-4 rounded-md shadow-sm transition-colors flex justify-center items-center gap-2">
+                        Run DFS Cycle Check
+                    </button>
+
+                    <div id="cycle-result" class="mt-6 hidden">
+                        <h3 class="font-bold text-sm uppercase tracking-wider mb-2" id="cycle-status-title">Result</h3>
+                        <div id="cycle-log" class="bg-slate-900 text-slate-300 font-mono text-xs p-4 rounded-md max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed"></div>
+                    </div>
+                </div>
+
+                <div id="tab-path" class="tab-content hide">
+                    <h2 class="text-xl font-bold mb-3 text-slate-800">BFS Path Traversal</h2>
+                    <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+                        Once the graph is cycle-free, we use Breadth-First Search (BFS) to isolate specific academic paths. <strong>Backward BFS</strong> scans matrix columns to find required ancestral courses (Prerequisites). <strong>Forward BFS</strong> scans matrix rows to find downstream unlocked courses (Post-requisites).
+                    </p>
+
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Select Target Course</label>
+                        <select id="sel-target" class="w-full p-2 border border-slate-300 rounded-md text-sm bg-white focus:outline-none focus:border-indigo-500 mb-3"></select>
+                        <button id="btn-find-path" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-md transition-colors">Generate Complete Chain</button>
+                    </div>
+
+                    <div id="path-result" class="hidden">
+                        <div class="flex items-center gap-2 mb-2 text-xs font-bold text-slate-500 uppercase">
+                            <span class="w-3 h-3 bg-blue-500 rounded-sm"></span> Prerequisites
+                            <span class="w-3 h-3 bg-indigo-600 rounded-sm ml-3"></span> Target
+                            <span class="w-3 h-3 bg-orange-500 rounded-sm ml-3"></span> Post-requisites
+                        </div>
+                        <div id="path-chain" class="bg-white border border-slate-200 p-4 rounded-md text-sm font-medium text-slate-700 flex flex-wrap gap-2 items-center">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="lg:col-span-7 flex flex-col gap-6">
+            
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex-grow flex flex-col">
+                <h3 class="font-bold text-slate-800 mb-2 flex justify-between items-center">
+                    <span>Directed Graph Visualization</span>
+                    <span class="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded">HTML Canvas</span>
+                </h3>
+                <div class="flex-grow bg-slate-50 rounded-lg border border-slate-200 relative min-h-[300px] flex items-center justify-center overflow-hidden">
+                    <canvas id="graphCanvas" width="600" height="400" class="max-w-full h-auto"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <h3 class="font-bold text-slate-800 mb-3">Adjacency Matrix State</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-center text-sm border-collapse" id="matrixTable">
+                        <thead class="bg-slate-100 text-slate-600">
+                            <tr id="matrix-header"></tr>
+                        </thead>
+                        <tbody id="matrix-body"></tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 text-center">Row = "Prerequisite For", Column = "Requires"</p>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        const courses = [
+            { id: 0, code: 'CS101', name: 'Intro to Programming', x: 100, y: 100 },
+            { id: 1, code: 'CS201', name: 'Data Structures', x: 300, y: 100 },
+            { id: 2, code: 'MTH101', name: 'Discrete Math', x: 100, y: 300 },
+            { id: 3, code: 'CS301', name: 'Databases', x: 500, y: 100 },
+            { id: 4, code: 'CS404', name: 'Algorithms', x: 300, y: 300 },
+            { id: 5, code: 'CS500', name: 'Advanced AI', x: 500, y: 300 }
+        ];
+
+        const N = courses.length;
+        let matrix = Array(N).fill(null).map(() => Array(N).fill(0));
+        
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        let nodeColors = Array(N).fill('#ffffff'); 
+        let nodeStrokes = Array(N).fill('#475569'); 
+
+        function init() {
+            matrix[0][1] = 1;
+            matrix[1][4] = 1; 
+            matrix[2][4] = 1; 
+            matrix[1][3] = 1; 
+            
+            populateDropdowns();
+            renderMatrix();
+            drawGraph();
+            initTabs();
+            initChart();
+        }
+
+        function populateDropdowns() {
+            const sels = [document.getElementById('sel-from'), document.getElementById('sel-to'), document.getElementById('sel-target')];
+            sels.forEach(sel => {
+                sel.innerHTML = '';
+                courses.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.code} - ${c.name}`;
+                    sel.appendChild(opt);
+                });
+            });
+            sels[1].selectedIndex = 1;
+        }
+
+        function renderMatrix() {
+            const head = document.getElementById('matrix-header');
+            const body = document.getElementById('matrix-body');
+            head.innerHTML = '<th class="p-2 border border-slate-200 bg-white"></th>';
+            courses.forEach(c => {
+                head.innerHTML += `<th class="p-2 border border-slate-200 font-medium">${c.code}</th>`;
+            });
+
+            body.innerHTML = '';
+            for(let i=0; i<N; i++) {
+                let row = `<tr><td class="p-2 border border-slate-200 font-medium bg-slate-100 text-slate-600">${courses[i].code}</td>`;
+                for(let j=0; j<N; j++) {
+                    const val = matrix[i][j];
+                    const cls = val ? 'matrix-cell active' : 'matrix-cell text-slate-300';
+                    row += `<td class="p-2 border border-slate-200 ${cls}" id="cell-${i}-${j}">${val}</td>`;
+                }
+                row += '</tr>';
+                body.innerHTML += row;
+            }
+        }
+
+        function drawGraph() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for(let i=0; i<N; i++) {
+                for(let j=0; j<N; j++) {
+                    if(matrix[i][j] === 1) {
+                        drawArrow(courses[i].x, courses[i].y, courses[j].x, courses[j].y, matrix[j][i] === 1);
+                    }
+                }
+            }
+
+            for(let i=0; i<N; i++) {
+                const c = courses[i];
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 25, 0, 2 * Math.PI);
+                ctx.fillStyle = nodeColors[i];
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = nodeStrokes[i];
+                ctx.stroke();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(c.code, c.x, c.y);
+            }
+        }
+
+        function drawArrow(fromX, fromY, toX, toY, isBidirectional) {
+            const headlen = 12; 
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+            const radius = 25;
+
+            let startX = fromX + radius * Math.cos(angle);
+            let startY = fromY + radius * Math.sin(angle);
+            let endX = toX - radius * Math.cos(angle);
+            let endY = toY - radius * Math.sin(angle);
+
+            if(isBidirectional) {
+                const offset = 8;
+                startX += offset * Math.cos(angle + Math.PI/2);
+                startY += offset * Math.sin(angle + Math.PI/2);
+                endX += offset * Math.cos(angle + Math.PI/2);
+                endY += offset * Math.sin(angle + Math.PI/2);
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - headlen * Math.cos(angle - Math.PI / 7), endY - headlen * Math.sin(angle - Math.PI / 7));
+            ctx.lineTo(endX - headlen * Math.cos(angle + Math.PI / 7), endY - headlen * Math.sin(angle + Math.PI / 7));
+            ctx.fillStyle = '#94a3b8';
+            ctx.fill();
+        }
+
+        function resetGraphVisuals() {
+            nodeColors = Array(N).fill('#ffffff');
+            nodeStrokes = Array(N).fill('#475569');
+            drawGraph();
+            renderMatrix();
+        }
+
+        document.getElementById('btn-add-edge').addEventListener('click', () => {
+            const u = parseInt(document.getElementById('sel-from').value);
+            const v = parseInt(document.getElementById('sel-to').value);
+            const msg = document.getElementById('build-msg');
+            
+            msg.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-emerald-100', 'text-emerald-700');
+            
+            if(u === v) {
+                msg.textContent = 'Cannot add prerequisite to itself.';
+                msg.classList.add('bg-red-100', 'text-red-700');
+            } else {
+                matrix[u][v] = 1;
+                resetGraphVisuals();
+                msg.textContent = `Rule Added: Must take ${courses[u].code} before ${courses[v].code}`;
+                msg.classList.add('bg-emerald-100', 'text-emerald-700');
+            }
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            matrix = Array(N).fill(null).map(() => Array(N).fill(0));
+            resetGraphVisuals();
+            document.getElementById('build-msg').classList.add('hidden');
+            document.getElementById('cycle-result').classList.add('hidden');
+            document.getElementById('path-result').classList.add('hidden');
+        });
+
+        document.getElementById('btn-check-cycle').addEventListener('click', () => {
+            resetGraphVisuals();
+            const logDiv = document.getElementById('cycle-log');
+            const resDiv = document.getElementById('cycle-result');
+            const title = document.getElementById('cycle-status-title');
+            logDiv.innerHTML = '';
+            resDiv.classList.remove('hidden');
+            title.className = 'font-bold text-sm uppercase tracking-wider mb-2';
+
+            const VISITED = 2, VISITING = 1, UNVISITED = 0;
+            let visitingStats = Array(N).fill(UNVISITED);
+            let logText = "";
+            let cycleFound = false;
+
+            function log(txt) { logText += txt + "\n"; }
+
+            function dfs(src) {
+                if(visitingStats[src] === VISITING) {
+                    log(`> NODE ${courses[src].code} is VISITING.`);
+                    log(`[!] CYCLE DETECTED! Returning to ${courses[src].code} before finishing its descendants.`);
+                    nodeColors[src] = '#fee2e2';
+                    nodeStrokes[src] = '#b91c1c';
+                    return true;
+                }
+                if(visitingStats[src] === VISITED) return false;
+
+                visitingStats[src] = VISITING;
+                nodeColors[src] = '#fef08a';
+                drawGraph();
+                log(`> Visiting ${courses[src].code} (Marked YELLOW)`);
+
+                for(let i=0; i<N; i++) {
+                    if(matrix[src][i] === 1) {
+                        log(`  -> Checking edge ${courses[src].code} -> ${courses[i].code}`);
+                        if(dfs(i)) {
+                            if(nodeColors[src] !== '#fee2e2') {
+                                nodeColors[src] = '#fee2e2';
+                                nodeStrokes[src] = '#b91c1c';
+                            }
+                            const cell = document.getElementById(`cell-${src}-${i}`);
+                            if(cell) cell.classList.add('highlight-cycle');
+                            return true;
+                        }
+                    }
+                }
+                visitingStats[src] = VISITED;
+                nodeColors[src] = '#1e293b'; 
+                drawGraph();
+                log(`< Completed ${courses[src].code} (Marked DARK SLATE)`);
+                return false;
+            }
+
+            for(let i=0; i<N; i++) {
+                if(visitingStats[i] === UNVISITED) {
+                    if(dfs(i)) {
+                        cycleFound = true;
+                        break;
+                    }
+                }
+            }
+
+            drawGraph();
+            logDiv.textContent = logText;
+            
+            if(cycleFound) {
+                title.textContent = 'Result: INVALID (Cycle Detected)';
+                title.classList.add('text-rose-600');
+            } else {
+                title.textContent = 'Result: VALID (No Cycles)';
+                title.classList.add('text-emerald-600');
+                nodeColors = Array(N).fill('#d1fae5');
+                nodeStrokes = Array(N).fill('#059669');
+                drawGraph();
+            }
+        });
+
+        document.getElementById('btn-find-path').addEventListener('click', () => {
+            resetGraphVisuals();
+            const targetId = parseInt(document.getElementById('sel-target').value);
+            const resDiv = document.getElementById('path-result');
+            const chainDiv = document.getElementById('path-chain');
+            resDiv.classList.remove('hidden');
+            chainDiv.innerHTML = '';
+
+            let required = Array(N).fill(false);
+            let revQ = [targetId];
+            required[targetId] = true;
+            
+            while(revQ.length > 0) {
+                let curr = revQ.shift();
+                for(let i=0; i<N; i++) {
+                    if(matrix[i][curr] === 1 && !required[i]) {
+                        required[i] = true;
+                        revQ.push(i);
+                        nodeColors[i] = '#bfdbfe';
+                        nodeStrokes[i] = '#2563eb';
+                    }
+                }
+            }
+
+            let unlocked = Array(N).fill(false);
+            let fwdQ = [targetId];
+            unlocked[targetId] = true;
+
+            while(fwdQ.length > 0) {
+                let curr = fwdQ.shift();
+                for(let i=0; i<N; i++) {
+                    if(matrix[curr][i] === 1 && !unlocked[i]) {
+                        unlocked[i] = true;
+                        fwdQ.push(i);
+                        nodeColors[i] = '#ffedd5';
+                        nodeStrokes[i] = '#ea580c';
+                    }
+                }
+            }
+
+            nodeColors[targetId] = '#c7d2fe';
+            nodeStrokes[targetId] = '#4f46e5';
+            drawGraph();
+
+            let seq = [];
+            for(let i=0; i<N; i++) if(required[i] && i !== targetId) seq.push(`<span class="text-blue-600">${courses[i].code}</span>`);
+            seq.push(`<span class="bg-indigo-600 text-white px-2 py-1 rounded shadow-sm">${courses[targetId].code}</span>`);
+            for(let i=0; i<N; i++) if(unlocked[i] && i !== targetId) seq.push(`<span class="text-orange-600">${courses[i].code}</span>`);
+
+            chainDiv.innerHTML = seq.join(' <span class="text-slate-300 mx-1">&#10132;</span> ');
+        });
+
+        function initTabs() {
+            const btns = document.querySelectorAll('.tab-btn');
+            btns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    btns.forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hide'));
+                    e.target.classList.add('active');
+                    document.getElementById(e.target.dataset.target).classList.remove('hide');
+                });
+            });
+        }
+
+        function initChart() {
+            const ctxChart = document.getElementById('complexityChart').getContext('2d');
+            const labels = [10, 50, 100, 200, 500];
+            const matrixData = labels.map(v => v * v);
+            const listData = labels.map(v => v + (v * 1.5)); 
+
+            new Chart(ctxChart, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Adjacency Matrix Space O(V²)',
+                            data: matrixData,
+                            borderColor: '#e11d48',
+                            backgroundColor: 'rgba(225, 29, 72, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Adjacency List Space O(V+E)',
+                            data: listData,
+                            borderColor: '#059669',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 10 } } },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Number of Courses (V)' } },
+                        y: { title: { display: true, text: 'Memory Units' }, type: 'logarithmic' }
+                    }
+                }
+            });
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
